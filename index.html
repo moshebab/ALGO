@@ -1,0 +1,457 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ALGO — אלגוריתמים (67504) | שקפי הרצאות</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&family=Rubik:wght@400;500;600;700&display=swap" rel="stylesheet">
+  <style>
+    :root {
+      --huji-navy: #16325c;
+      --huji-navy-dark: #0f223f;
+      --huji-gold: #c8a44d;
+      --huji-gold-light: #f6ecd2;
+      --bg: #f8fafc;
+      --card-bg: #ffffff;
+      --border: #e2e8f0;
+      --text: #0f172a;
+      --text-muted: #475569;
+      --primary: #16325c;
+      --primary-hover: #1e40af;
+      --secondary: #0f766e;
+      --secondary-hover: #115e59;
+      --shadow-sm: 0 1px 3px rgba(0,0,0,0.06), 0 1px 2px rgba(0,0,0,0.04);
+      --shadow-md: 0 4px 6px -1px rgba(0,0,0,0.07), 0 2px 4px -1px rgba(0,0,0,0.04);
+      --shadow-lg: 0 10px 15px -3px rgba(0,0,0,0.08), 0 4px 6px -2px rgba(0,0,0,0.03);
+      --radius: 12px;
+    }
+
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
+
+    body {
+      font-family: 'Heebo', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      line-height: 1.5;
+      padding: 0 0 60px 0;
+      direction: rtl;
+    }
+
+    header {
+      background: linear-gradient(135deg, var(--huji-navy-dark) 0%, var(--huji-navy) 100%);
+      color: #ffffff;
+      padding: 48px 24px 40px;
+      border-bottom: 4px solid var(--huji-gold);
+      box-shadow: var(--shadow-md);
+    }
+
+    .header-inner {
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .univ-tag {
+      display: inline-block;
+      font-size: 0.88rem;
+      font-weight: 500;
+      color: var(--huji-gold);
+      letter-spacing: 0.5px;
+      margin-bottom: 8px;
+    }
+
+    h1 {
+      font-family: 'Rubik', sans-serif;
+      font-size: 2.3rem;
+      font-weight: 700;
+      margin-bottom: 8px;
+      letter-spacing: -0.5px;
+    }
+
+    .header-desc {
+      font-size: 1.1rem;
+      color: #e2e8f0;
+      max-width: 700px;
+      margin-bottom: 20px;
+    }
+
+    .stats-bar {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      margin-top: 16px;
+    }
+
+    .stat-pill {
+      background: rgba(255, 255, 255, 0.12);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.88rem;
+      color: #f1f5f9;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .stat-pill strong {
+      color: #ffffff;
+      font-weight: 700;
+    }
+
+    .container {
+      max-width: 1100px;
+      margin: 32px auto 0;
+      padding: 0 20px;
+    }
+
+    .controls {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 16px;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 28px;
+    }
+
+    .search-box {
+      position: relative;
+      flex: 1;
+      min-width: 260px;
+      max-width: 440px;
+    }
+
+    .search-box input {
+      width: 100%;
+      padding: 10px 16px 10px 38px;
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      font-family: inherit;
+      font-size: 0.95rem;
+      background: #ffffff;
+      color: var(--text);
+      outline: none;
+      transition: all 0.2s;
+    }
+
+    .search-box input:focus {
+      border-color: var(--huji-navy);
+      box-shadow: 0 0 0 3px rgba(22, 50, 92, 0.12);
+    }
+
+    .search-box svg {
+      position: absolute;
+      left: 12px;
+      top: 50%;
+      transform: translateY(-50%);
+      width: 18px;
+      height: 18px;
+      fill: var(--text-muted);
+    }
+
+    .filter-tags {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 8px;
+    }
+
+    .filter-btn {
+      background: #ffffff;
+      border: 1px solid var(--border);
+      padding: 6px 14px;
+      border-radius: 20px;
+      font-size: 0.85rem;
+      font-family: inherit;
+      cursor: pointer;
+      color: var(--text-muted);
+      transition: all 0.2s;
+    }
+
+    .filter-btn:hover {
+      border-color: var(--huji-navy);
+      color: var(--huji-navy);
+    }
+
+    .filter-btn.active {
+      background: var(--huji-navy);
+      color: #ffffff;
+      border-color: var(--huji-navy);
+    }
+
+    .cards-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+      gap: 20px;
+    }
+
+    .lecture-card {
+      background: var(--card-bg);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 22px;
+      display: flex;
+      flex-direction: column;
+      box-shadow: var(--shadow-sm);
+      transition: all 0.25s cubic-bezier(0.16, 1, 0.3, 1);
+      position: relative;
+    }
+
+    .lecture-card:hover {
+      transform: translateY(-3px);
+      box-shadow: var(--shadow-md);
+      border-color: #cbd5e1;
+    }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 12px;
+      gap: 8px;
+    }
+
+    .card-badges {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .badge-num {
+      background: var(--huji-navy);
+      color: #ffffff;
+      font-weight: 700;
+      font-size: 0.8rem;
+      padding: 3px 9px;
+      border-radius: 6px;
+      letter-spacing: 0.3px;
+    }
+
+    .badge-tag {
+      font-size: 0.76rem;
+      font-weight: 600;
+      padding: 3px 8px;
+      border-radius: 6px;
+    }
+
+    .badge-lecturer {
+      font-size: 0.78rem;
+      color: var(--text-muted);
+      font-weight: 500;
+    }
+
+    .card-title {
+      font-family: 'Rubik', sans-serif;
+      font-size: 1.18rem;
+      font-weight: 600;
+      color: var(--huji-navy);
+      line-height: 1.35;
+      margin-bottom: 8px;
+    }
+
+    .card-subtitle {
+      font-size: 0.88rem;
+      color: var(--text-muted);
+      margin-bottom: 18px;
+      flex-grow: 1;
+      line-height: 1.45;
+    }
+
+    .card-actions {
+      margin-top: auto;
+      padding-top: 14px;
+      border-top: 1px solid #f1f5f9;
+    }
+
+    .btn-group {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 8px;
+      padding: 8px 14px;
+      border-radius: 7px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      text-decoration: none;
+      transition: all 0.18s;
+      text-align: center;
+    }
+
+    .btn-primary {
+      background: var(--primary);
+      color: #ffffff;
+    }
+
+    .btn-primary:hover {
+      background: var(--primary-hover);
+      color: #ffffff;
+    }
+
+    .btn-secondary {
+      background: var(--secondary);
+      color: #ffffff;
+    }
+
+    .btn-secondary:hover {
+      background: var(--secondary-hover);
+      color: #ffffff;
+    }
+
+    .btn-outline {
+      background: #ffffff;
+      color: var(--huji-navy);
+      border: 1px solid #cbd5e1;
+    }
+
+    .btn-outline:hover {
+      background: #f1f5f9;
+      border-color: var(--huji-navy);
+    }
+
+    .badge-board {
+      display: inline-block;
+      padding: 6px 12px;
+      background: #f1f5f9;
+      color: var(--text-muted);
+      font-size: 0.82rem;
+      border-radius: 6px;
+      text-align: center;
+      font-weight: 500;
+    }
+
+    footer {
+      margin-top: 60px;
+      text-align: center;
+      font-size: 0.85rem;
+      color: var(--text-muted);
+      border-top: 1px solid var(--border);
+      padding-top: 24px;
+    }
+
+    @media (max-width: 640px) {
+      header {
+        padding: 32px 16px 28px;
+      }
+      h1 {
+        font-size: 1.7rem;
+      }
+      .cards-grid {
+        grid-template-columns: 1fr;
+      }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="header-inner">
+      <div class="univ-tag">האוניברסיטה העברית בירושלים · בית הספר להנדסה ולמדעי המחשב</div>
+      <h1>ALGO — אלגוריתמים (67504)</h1>
+      <p class="header-desc">שקפי הרצאות וסימולציות אינטראקטיביות</p>
+      <div class="stats-bar">
+        <span class="stat-pill"><strong>2</strong> הרצאות מפורסמות</span>
+        <span class="stat-pill">סמסטר א׳ · תשפ״ז</span>
+      </div>
+    </div>
+  </header>
+
+  <main class="container">
+    <div class="controls">
+      <div class="search-box">
+        <input type="text" id="searchInput" placeholder="חיפוש הרצאה או נושא..." oninput="filterCards()">
+        <svg viewBox="0 0 24 24"><path d="M15.5 14h-.79l-.28-.27A6.471 6.471 0 0 0 16 9.5 6.5 6.5 0 1 0 9.5 16c1.61 0 3.09-.59 4.23-1.57l.27.28v.79l5 4.99L20.49 19l-4.99-5zm-6 0C7.01 14 5 11.99 5 9.5S7.01 5 9.5 5 14 7.01 14 9.5 11.99 14 9.5 14z"/></svg>
+      </div>
+      <div class="filter-tags">
+        <button class="filter-btn active" onclick="setFilter('all', this)">הכל</button>
+      </div>
+    </div>
+
+    <section class="cards-grid" id="cardsGrid">
+      <article class="lecture-card" data-num="07" data-lecturer="פרופ׳ משה בביוף" data-tag="אלגוריתמי קירוב">
+        <div class="card-header">
+          <div class="card-badges">
+            <span class="badge-num">הרצאה 07</span>
+            <span class="badge-tag" style="background-color: #b23b3b18; color: #b23b3b; border: 1px solid #b23b3b40;">אלגוריתמי קירוב</span>
+          </div>
+          <span class="badge-lecturer">פרופ׳ משה בביוף</span>
+        </div>
+        <h2 class="card-title">איזון עומסים במכונות (Load Balancing)</h2>
+        <p class="card-subtitle">מבוא לאלגוריתמי קירוב, חמדן מקוון (2-1/k קירוב), וחמדן ממוין LPT (3/2 קירוב)</p>
+        <div class="card-actions">
+          <div class="btn-group">
+            <a href="lectures/07-load-balancing/slides-load-balancing-expanded.html" target="_blank" class="btn btn-primary">🖥 שקפי הרצאה</a>
+            <a href="lectures/07-load-balancing/load-balancing-animation-minimal.html" target="_blank" class="btn btn-outline">🎨 סימולציה אינטראקטיבית</a>
+          </div>
+        </div>
+      </article>
+
+      <article class="lecture-card" data-num="08" data-lecturer="פרופ׳ משה בביוף" data-tag="אלגוריתמי קירוב">
+        <div class="card-header">
+          <div class="card-badges">
+            <span class="badge-num">הרצאה 08</span>
+            <span class="badge-tag" style="background-color: #b23b3b18; color: #b23b3b; border: 1px solid #b23b3b40;">אלגוריתמי קירוב</span>
+          </div>
+          <span class="badge-lecturer">פרופ׳ משה בביוף</span>
+        </div>
+        <h2 class="card-title">כיסוי קבוצות (Set Cover)</h2>
+        <p class="card-subtitle">אלגוריתם חמדן, ניתוח יחס קירוב לוגריתמי ln(n), והדיקות הניתוח</p>
+        <div class="card-actions">
+          <div class="btn-group">
+            <a href="lectures/08-set-cover/slides-set-cover.html" target="_blank" class="btn btn-primary">🖥 שקפי הרצאה</a>
+          </div>
+        </div>
+      </article>
+    </section>
+
+    <footer>
+      ALGO · קורס אלגוריתמים (67504) · האוניברסיטה העברית בירושלים
+    </footer>
+  </main>
+
+  <script>
+    let activeTag = 'all';
+
+    function setFilter(tag, btn) {
+      activeTag = tag;
+      document.querySelectorAll('.filter-btn').forEach(b => b.classList.remove('active'));
+      btn.classList.add('active');
+      filterCards();
+    }
+
+    function filterCards() {
+      const query = document.getElementById('searchInput').value.trim().toLowerCase();
+      const cards = document.querySelectorAll('.lecture-card');
+
+      cards.forEach(card => {
+        const text = card.textContent.toLowerCase();
+        const cardTag = card.getAttribute('data-tag') || '';
+        const cardLecturer = card.getAttribute('data-lecturer') || '';
+
+        const matchesQuery = !query || text.includes(query);
+        let matchesTag = true;
+
+        if (activeTag !== 'all') {
+          if (activeTag === 'בביוף') {
+            matchesTag = cardLecturer.includes('בביוף');
+          } else if (activeTag === 'בר סיני') {
+            matchesTag = cardLecturer.includes('בר סיני');
+          } else {
+            matchesTag = cardTag === activeTag;
+          }
+        }
+
+        card.style.display = (matchesQuery && matchesTag) ? 'flex' : 'none';
+      });
+    }
+  </script>
+</body>
+</html>

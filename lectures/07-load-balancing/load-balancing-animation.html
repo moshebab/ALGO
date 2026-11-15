@@ -1,0 +1,1342 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>אלגוריתמי קירוב — תזמון משימות ואיזון עומסים (Load Balancing)</title>
+<style>
+  :root {
+    --navy: #16325c;
+    --navy-light: #3a5a8c;
+    --navy-soft: #eef2f7;
+    --blue-avg: #1d6fa5;
+    --gold: #c8a44d;
+    --gold-bg: #f7f3e8;
+    --gold-soft: #f6ecd2;
+    --red: #b23b3b;
+    --red-soft: #fbeaea;
+    --green: #2b7a4b;
+    --green-soft: #e7f4ec;
+    --ink: #1c1c1c;
+    --muted: #5a6270;
+    --gray: #c9ccd1;
+    --rule: #d8dbe2;
+    --bg: #fafbfd;
+  }
+  * { box-sizing: border-box; }
+  span[dir="ltr"], b[dir="ltr"] {
+    unicode-bidi: isolate;
+  }
+  html, body {
+    margin: 0; padding: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: 'Helvetica Neue', 'Arial Hebrew', 'Noto Sans Hebrew', Arial, sans-serif;
+    min-height: 100vh;
+  }
+  body {
+    display: grid;
+    grid-template-rows: auto auto 1fr auto;
+    max-width: 1380px;
+    margin: 0 auto;
+    padding: 14px 26px 16px;
+    gap: 10px;
+    min-height: 100vh;
+  }
+  header {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 3px solid var(--gold);
+    padding-bottom: 6px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  header h1 {
+    margin: 0;
+    font-size: 1.52rem;
+    color: var(--navy);
+    font-weight: 700;
+  }
+  header .sub {
+    color: var(--muted);
+    font-size: 1rem;
+  }
+
+  /* Chapter navigation pills */
+  .chapters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    justify-content: space-between;
+  }
+  .chapter-pills {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 6px;
+  }
+  .chap-btn {
+    border: 1.5px solid var(--rule);
+    background: #fff;
+    color: var(--navy);
+    font-family: inherit;
+    font-size: 0.88rem;
+    font-weight: 700;
+    padding: 5px 10px;
+    border-radius: 999px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .chap-btn:hover {
+    border-color: var(--gold);
+    background: var(--gold-bg);
+  }
+  .chap-btn.active {
+    background: var(--navy);
+    color: #fff;
+    border-color: var(--navy);
+  }
+  .k-selector {
+    display: none;
+    align-items: center;
+    gap: 6px;
+    background: var(--gold-bg);
+    border: 1.5px solid var(--gold);
+    padding: 4px 12px;
+    border-radius: 999px;
+    font-size: 0.98rem;
+    font-weight: 700;
+    color: var(--navy);
+  }
+  .k-selector.visible {
+    display: inline-flex;
+  }
+  .k-btn {
+    border: 1.5px solid var(--navy);
+    background: #fff;
+    color: var(--navy);
+    font-weight: 700;
+    font-size: 0.94rem;
+    width: 30px;
+    height: 28px;
+    border-radius: 6px;
+    cursor: pointer;
+    padding: 0;
+  }
+  .k-btn.active {
+    background: var(--navy);
+    color: #fff;
+  }
+
+  /* Main content layout */
+  .stage {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+    justify-content: flex-start;
+  }
+
+  /* Queue bar */
+  .queue-card {
+    background: #fff;
+    border: 1.5px solid var(--rule);
+    border-radius: 8px;
+    padding: 10px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .queue-row {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    flex-wrap: wrap;
+  }
+  .queue-stats-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    flex-wrap: wrap;
+    padding-top: 6px;
+    border-top: 1px dashed var(--rule);
+  }
+  .queue-label {
+    font-weight: 700;
+    color: var(--navy);
+    font-size: 1.1rem;
+    min-width: 185px;
+  }
+  .job-pills {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    direction: ltr;
+    flex-wrap: wrap;
+  }
+  .job-pill {
+    display: inline-flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    height: 46px;
+    padding: 2px 6px;
+    border-radius: 7px;
+    border: 2.5px solid var(--navy);
+    color: #fff;
+    font-family: Georgia, 'Times New Roman', serif;
+    transition: all 0.2s;
+    position: relative;
+  }
+  .job-pill .j-idx {
+    font-size: 0.76rem;
+    color: rgba(255, 255, 255, 0.9);
+    line-height: 1;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+  .job-pill .j-val {
+    font-size: 1.26rem;
+    font-weight: 700;
+    line-height: 1.15;
+    color: #fff;
+  }
+  .job-pill.done {
+    opacity: 0.42;
+    filter: saturate(0.75);
+  }
+  .job-pill.current {
+    transform: translateY(-3px) scale(1.04);
+    box-shadow: 0 0 0 2.5px #fff, 0 0 0 5.5px #16325c, 0 4px 10px rgba(22,50,92,0.3);
+    z-index: 2;
+  }
+  .job-pill.pigeon {
+    box-shadow: 0 0 0 2px #fff, 0 0 0 5px var(--gold);
+  }
+  .stats-badges {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    direction: ltr;
+    align-items: center;
+  }
+  .size-legend {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 0.94rem;
+    font-weight: 700;
+    color: var(--muted);
+  }
+  .legend-dot {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    padding: 2px 8px;
+    border-radius: 5px;
+    color: #fff;
+    font-family: Georgia, serif;
+    font-size: 0.92rem;
+    font-weight: 700;
+    direction: ltr;
+  }
+  .stat-badge {
+    background: var(--navy-soft);
+    border: 1.5px solid #cdd6e4;
+    color: var(--navy);
+    padding: 4px 11px;
+    border-radius: 6px;
+    font-family: Georgia, serif;
+    font-size: 0.98rem;
+    font-weight: 700;
+  }
+  .stat-badge.tmax-badge {
+    background: var(--red-soft);
+    border-color: #d88a8a;
+    color: #9b2c2c;
+  }
+  .stat-badge.avg-badge {
+    background: #eaf4fb;
+    border-color: var(--blue-avg);
+    color: var(--blue-avg);
+  }
+  .stat-badge.opt-badge {
+    background: var(--green-soft);
+    border-color: var(--green);
+    color: var(--green);
+  }
+
+  /* Panels grid */
+  .panels {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+  .panels.two-col {
+    grid-template-columns: 1fr 1fr;
+  }
+  .panel {
+    background: #fff;
+    border: 1.5px solid var(--rule);
+    border-radius: 8px;
+    padding: 10px 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .panel.highlight-panel {
+    border-color: var(--navy);
+    box-shadow: 0 2px 8px rgba(22, 50, 92, 0.08);
+  }
+  .panel-head {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    border-bottom: 1px solid var(--rule);
+    padding-bottom: 5px;
+    gap: 8px;
+  }
+  .panel-title {
+    font-weight: 700;
+    color: var(--navy);
+    font-size: 1.15rem;
+  }
+  .panel-score {
+    font-family: Georgia, serif;
+    font-weight: 700;
+    font-size: 1.12rem;
+    direction: ltr;
+  }
+  .panel svg {
+    width: 100%;
+    max-height: 290px;
+    height: auto;
+    display: block;
+    direction: ltr;
+  }
+  .panel.proof-panel svg {
+    max-height: 210px;
+  }
+
+  /* Caption & formula box */
+  .caption-box {
+    background: var(--gold-bg);
+    border-right: 6px solid var(--gold);
+    border-radius: 6px;
+    padding: 12px 18px;
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+  .caption-top {
+    display: grid;
+    grid-template-columns: 1fr auto;
+    align-items: center;
+    gap: 18px;
+  }
+  .caption-box .step-tag {
+    display: inline-block;
+    background: var(--navy);
+    color: #fff;
+    font-size: 0.92rem;
+    font-weight: 700;
+    padding: 3px 10px;
+    border-radius: 4px;
+    margin-left: 10px;
+    vertical-align: middle;
+  }
+  .caption-box .explain {
+    font-size: 1.16rem;
+    line-height: 1.5;
+  }
+  .caption-box .formula {
+    direction: ltr;
+    text-align: left;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.16rem;
+    background: #fff;
+    border: 1.5px solid #e3dac3;
+    border-radius: 6px;
+    padding: 8px 15px;
+    white-space: nowrap;
+    color: var(--ink);
+  }
+  .caption-box .formula .Chosen {
+    color: var(--red);
+    font-weight: 700;
+  }
+  .caption-box .formula .Good {
+    color: var(--green);
+    font-weight: 700;
+  }
+
+  /* Two-column Proof + Instantiation box (for Proof steps) */
+  .proof-grid {
+    display: none;
+    grid-template-columns: 1fr 1fr;
+    gap: 14px;
+    padding-top: 6px;
+    border-top: 1.5px dashed #d8cca8;
+  }
+  .proof-grid.visible {
+    display: grid;
+  }
+  .proof-card {
+    background: #fff;
+    border: 1.5px solid #dfd5b8;
+    border-radius: 8px;
+    padding: 10px 16px;
+  }
+  .proof-card.inst-card {
+    border-color: var(--navy);
+    background: #f8fafd;
+  }
+  .proof-card-title {
+    font-size: 1.08rem;
+    font-weight: 700;
+    color: var(--navy);
+    border-bottom: 2px solid var(--gold);
+    padding-bottom: 4px;
+    margin-bottom: 8px;
+  }
+  .proof-lines {
+    direction: ltr;
+    text-align: left;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 1.14rem;
+    line-height: 1.68;
+    color: var(--ink);
+  }
+  .proof-lines .pline {
+    display: flex;
+    align-items: baseline;
+    justify-content: space-between;
+    gap: 10px;
+    border-bottom: 1px dotted #e5e7eb;
+    padding: 2px 0;
+  }
+  .proof-lines .pline:last-child {
+    border-bottom: none;
+  }
+  .proof-lines .p-reason {
+    direction: rtl;
+    font-family: 'Helvetica Neue', 'Arial Hebrew', Arial, sans-serif;
+    font-size: 0.95rem;
+    color: var(--muted);
+    font-weight: 600;
+  }
+  .hl-red { color: var(--red); font-weight: 700; }
+  .hl-green { color: var(--green); font-weight: 700; }
+  .hl-blue { color: var(--blue-avg); font-weight: 700; }
+  .hl-navy { color: var(--navy); font-weight: 700; }
+
+  /* Controls bar */
+  .controls {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 14px;
+    padding-top: 4px;
+    border-top: 1px solid var(--rule);
+  }
+  button.nav-btn {
+    background: var(--navy);
+    color: #fff;
+    border: none;
+    border-radius: 6px;
+    padding: 8px 18px;
+    font-size: 1.05rem;
+    font-family: inherit;
+    cursor: pointer;
+    font-weight: 700;
+  }
+  button.nav-btn:hover:not(:disabled) { background: #1f447c; }
+  button.nav-btn:disabled { background: var(--gray); cursor: not-allowed; }
+  button.nav-btn.secondary {
+    background: #eef0f4;
+    color: var(--navy);
+  }
+  button.nav-btn.secondary:hover:not(:disabled) { background: #dfe3ea; }
+  .counter {
+    font-variant-numeric: tabular-nums;
+    color: var(--muted);
+    min-width: 95px;
+    text-align: center;
+    font-size: 1.05rem;
+    font-weight: 700;
+    direction: ltr;
+  }
+  .kbd {
+    font-family: 'SF Mono', Menlo, monospace;
+    background: #eef0f4;
+    padding: 2px 7px;
+    border-radius: 4px;
+    font-size: 0.88em;
+    color: var(--navy);
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>תזמון משימות ואיזון עומסים (Load Balancing) — אופטימום, חמדן ללא מיון, וחמדן ממוין (LPT)</h1>
+  <div class="sub">אלגוריתמים · פרופ׳ משה בביוף · האוניברסיטה העברית &nbsp;|&nbsp; מקשים: <span class="kbd">→</span> <span class="kbd">←</span> <span class="kbd">Space</span></div>
+</header>
+
+<div class="chapters">
+  <div class="chapter-pills" id="chapterPills">
+    <button class="chap-btn" data-jump="0">0. הפתרון האופטימלי (OPT מול Avg)</button>
+    <button class="chap-btn" data-jump="1">1. חמדן ללא מיון (List Scheduling)</button>
+    <button class="chap-btn" data-jump="9">2. הוכחת הקירוב: <span dir="ltr">2 − 1/k</span></button>
+    <button class="chap-btn" data-jump="10">3. הדוקות הניתוח לחמדן ללא מיון לכל <span dir="ltr">k</span></button>
+    <button class="chap-btn" data-jump="12">4. מיון והרצת החמדן הממוין (LPT)</button>
+    <button class="chap-btn" data-jump="20">5. הוכחת הקירוב ל-LPT: <span dir="ltr">3/2 − 1/(2k)</span></button>
+    <button class="chap-btn" data-jump="21">6. השוואת 3 הפתרונות</button>
+  </div>
+  <div class="k-selector" id="kSelector">
+    <span>בחר מספר מכונות k:</span>
+    <button class="k-btn" data-k="2">2</button>
+    <button class="k-btn active" data-k="3">3</button>
+    <button class="k-btn" data-k="4">4</button>
+    <button class="k-btn" data-k="5">5</button>
+  </div>
+</div>
+
+<div class="stage">
+  <div class="queue-card" id="queueCard"></div>
+  <div class="panels" id="panelsContainer"></div>
+  <div class="caption-box" id="captionBox">
+    <div class="caption-top">
+      <div>
+        <span class="step-tag" id="stepTag"></span>
+        <span class="explain" id="explainText"></span>
+      </div>
+      <div class="formula" id="formulaBox"></div>
+    </div>
+    <div class="proof-grid" id="proofGrid"></div>
+  </div>
+</div>
+
+<div class="controls">
+  <button class="nav-btn secondary" id="resetBtn" title="לתחילת ההדגמה (Home)">↺ התחלה</button>
+  <button class="nav-btn" id="prevBtn" title="צעד קודם (←)">→ הקודם</button>
+  <div class="counter" id="counter"></div>
+  <button class="nav-btn" id="nextBtn" title="צעד הבא (→ או רווח)">הבא ←</button>
+</div>
+
+<script>
+// ============================================================================
+// Data & Precomputed Schedules for Lecture 07
+// Updated example: jobs [3, 3, 3, 4, 5, 4, 6] -> sum = 28, Avg = 28/3 = 9.33, OPT = 10
+// ============================================================================
+const UNSORTED_JOBS = [3, 3, 3, 4, 5, 4, 6];
+const SORTED_JOBS   = [6, 5, 4, 4, 3, 3, 3];
+const AVG_MAIN = 28 / 3; // 9.333...
+const OPT_MAIN = 10;
+
+// Consistent color palette by job length (same size => exact same color everywhere)
+const JOB_SIZE_COLORS = {
+  1: { fill: '#4a6fa5', border: '#2c4c7e', name: 'אורך 1' },
+  2: { fill: '#2f855a', border: '#22543d', name: 'אורך 2' },
+  3: { fill: '#2b6cb0', border: '#1e4e8c', name: 'אורך 3' },
+  4: { fill: '#0f766e', border: '#115e59', name: 'אורך 4' },
+  5: { fill: '#6b46c1', border: '#44337a', name: 'אורך 5' },
+  6: { fill: '#c53030', border: '#822727', name: 'אורך 6' }
+};
+
+function getJobColor(len, isBigTight = false) {
+  if (isBigTight) {
+    return { fill: '#c53030', border: '#822727' };
+  }
+  return JOB_SIZE_COLORS[len] || { fill: '#16325c', border: '#0f2342' };
+}
+
+// Unsorted Greedy assignments on [3, 3, 3, 4, 5, 4, 6]:
+// j=1(3)->M1, j=2(3)->M2, j=3(3)->M3, j=4(4)->M1, j=5(5)->M2, j=6(4)->M3, j=7(6)->M3
+// Loads before j=7: (7, 8, 7); j=7(6) placed on M3 -> (7, 8, 13)
+const UNSORTED_ASSIGNMENTS = [0, 1, 2, 0, 1, 2, 2];
+
+// Sorted Greedy (LPT) assignments on [6, 5, 4, 4, 3, 3, 3]:
+// j=1(6)->M1, j=2(5)->M2, j=3(4)->M3, j=4(4)->M3(load 8), j=5(3)->M2(load 8), j=6(3)->M1(load 9), j=7(3)->M3(load 11)
+const SORTED_ASSIGNMENTS   = [0, 1, 2, 2, 1, 0, 2];
+
+// Optimal schedule for [3, 3, 3, 4, 5, 4, 6]:
+// M1: {6, 3} = 9, M2: {5, 4} = 9, M3: {4, 3, 3} = 10 -> q(S*) = 10
+const OPT_MACHINES = [
+  [{ len: 6, label: '6' }, { len: 3, label: '3' }],
+  [{ len: 5, label: '5' }, { len: 4, label: '4' }],
+  [{ len: 4, label: '4' }, { len: 3, label: '3' }, { len: 3, label: '3' }]
+];
+
+function buildPrefixMachines(jobs, assignments, upToStep, k = 3) {
+  const machines = Array.from({ length: k }, () => []);
+  for (let s = 0; s < upToStep; s++) {
+    const m = assignments[s];
+    machines[m].push({
+      len: jobs[s],
+      jobIdx: s + 1,
+      isLatest: s === upToStep - 1
+    });
+  }
+  return machines;
+}
+
+function getLoads(machines) {
+  return machines.map(m => m.reduce((acc, jb) => acc + jb.len, 0));
+}
+
+let tightK = 3;
+
+// ============================================================================
+// Step Definitions (22 steps: 0..21)
+// ============================================================================
+function buildSteps() {
+  const steps = [];
+
+  // Step 0 (Chapter 0): Show OPT and how OPT != Avg, with both bounds compared to OPT
+  steps.push({
+    chapter: 0,
+    tag: '0. הפתרון האופטימלי (<span dir="ltr">OPT = 10</span>) ושני החסמים התחתונים על <span dir="ltr">q(S<sup>*</sup>)</span>',
+    mode: 'show_opt',
+    upTo: 0,
+    explain: 'נתונות <b dir="ltr">k = 3</b> מכונות זהות ו-<b dir="ltr">n = 7</b> משימות: <b dir="ltr">3, 3, 3, 4, 5, 4, 6</b> (כל גודל משימה צבוע בצבע קבוע). לכל פתרון <b dir="ltr">S<sup>*</sup> ∈ S</b> מתקיימים שני חסמים תחתונים בלתי-תלויים: (1) <b dir="ltr" style="color:var(--red)">t<sub>max</sub> = 6 ≤ q(S<sup>*</sup>)</b>, ו-(2) <b dir="ltr" style="color:var(--blue-avg)">Avg = 28/3 = 9⅓ ≤ q(S<sup>*</sup>)</b>. מכיוון שזמני המשימות שלמים, הפתרון האופטימלי משיג <b dir="ltr" style="color:var(--green)">q(S<sup>*</sup>) = OPT = 10</b>.',
+    formula: '<span class="Chosen">t<sub>max</sub> = 6</span> ≤ <span class="Good">q(S<sup>*</sup>) = 10</span> &nbsp;&nbsp;|&nbsp;&nbsp; <span style="color:var(--blue-avg);font-weight:700">Avg = 28/3 = 9⅓</span> ≤ <span class="Good">q(S<sup>*</sup>) = 10</span>'
+  });
+
+  // Step 1 (Chapter 1): Start Unsorted Greedy
+  steps.push({
+    chapter: 1,
+    tag: '1. חמדן ללא מיון — אתחול',
+    mode: 'unsorted_run',
+    upTo: 0,
+    explain: 'כעת נריץ את <b>האלגוריתם החמדן (<span dir="ltr">List Scheduling</span>)</b> על המשימות בסדר הגעתן <b dir="ltr">3, 3, 3, 4, 5, 4, 6</b>. שימו לב לשני הקווים המקווקווים על הציר: <b dir="ltr" style="color:var(--blue-avg)">Avg = 9⅓</b> (החסם התחתון מהממוצע) ו-<b dir="ltr" style="color:var(--green)">OPT = 10</b> (האופטימום האמיתי).',
+    formula: 'T₁ = 0 ,  T₂ = 0 ,  T₃ = 0'
+  });
+
+  // Steps 2..8 (Chapter 1): Step-by-step Unsorted Greedy
+  for (let s = 1; s <= 7; s++) {
+    const prevMachines = buildPrefixMachines(UNSORTED_JOBS, UNSORTED_ASSIGNMENTS, s - 1);
+    const prevLoads = getLoads(prevMachines);
+    const chosenM = UNSORTED_ASSIGNMENTS[s - 1];
+    const jobLen = UNSORTED_JOBS[s - 1];
+    const newLoads = [...prevLoads];
+    newLoads[chosenM] += jobLen;
+    const minVal = prevLoads[chosenM];
+
+    let extraNote = '';
+    if (s <= 3) {
+      extraNote = `מכונה <b dir="ltr">M${chosenM + 1}</b> פנויה לגמרי (עומס 0), ולכן משימה ${s} (באורך <b>${jobLen}</b>, בצבע כחול) משובצת אליה.`;
+    } else if (s === 4) {
+      extraNote = `העומסים כרגע הם <span dir="ltr">(3, 3, 3)</span>. כולן בעומס מינימלי <b>3</b>; משבצים את משימה 4 (באורך <b>4</b>, טורקיז) ל-<b dir="ltr">M1</b> והעומס שלה עולה ל-7.`;
+    } else if (s === 5) {
+      extraNote = `העומסים כרגע הם <span dir="ltr">(7, 3, 3)</span>. המינימום הוא <b>3</b> (ב-<span dir="ltr">M2</span> ו-<span dir="ltr">M3</span>); משבצים את משימה 5 (באורך <b>5</b>, סגול) ל-<b dir="ltr">M2</b> והעומס שלה עולה ל-8.`;
+    } else if (s === 6) {
+      extraNote = `העומסים כרגע הם <span dir="ltr">(7, 8, 3)</span>. המכונה הפנויה ביותר היא <b dir="ltr">M3</b> (עומס 3); משימה 6 (באורך <b>4</b>, טורקיז) משובצת ל-<span dir="ltr">M3</span> והעומס שלה עולה ל-7.`;
+    } else if (s === 7) {
+      extraNote = `<b>הצעד הקריטי (משימה אחרונה <span dir="ltr">ℓ = 7</span>, באורך 6, אדום):</b> לפני השיבוץ העומסים הם <span dir="ltr">(7, 8, 7)</span>. מכונה <b dir="ltr">M3</b> אכן בעלת עומס מינימלי (<b dir="ltr">F₃(G) = 7 ≤ 22/3 = 7⅓</b>), אך תוספת העבודה הגדולה <b dir="ltr">t₇ = 6</b> מקפיצה את העומס שלה ל-<b>13</b>.`;
+    }
+
+    steps.push({
+      chapter: 1,
+      tag: `חמדן ללא מיון — משימה <span dir="ltr">j = ${s}</span>`,
+      mode: 'unsorted_run',
+      upTo: s,
+      prevLoads,
+      chosenM,
+      explain: extraNote,
+      formula: `min(T₁, T₂, T₃) = min(${prevLoads.join(', ')}) = ${minVal}  ⇒  M${chosenM + 1}: ${minVal} + ${jobLen} = <span class="Chosen">${newLoads[chosenM]}</span>`
+    });
+  }
+
+  // Step 9 (Chapter 2): Proof Insight for (2 - 1/k) + General Proof & Example Instantiation
+  steps.push({
+    chapter: 2,
+    tag: '2. הוכחת משפט ה-<span dir="ltr">(2 − 1/k)</span>-קירוב (לכל <span dir="ltr">S<sup>*</sup></span>) והצבה בדוגמה',
+    mode: 'proof_unsorted',
+    upTo: 7,
+    explain: 'במכונה העמוסה ביותר <b dir="ltr">i<sup>*</sup> = 3</b> (<b dir="ltr">q(G) = 13</b>), העבודה האחרונה היא <b dir="ltr">ℓ = 7 (t<sub>7</sub> = 6)</b>. מיד לפני השמתה, העומס <b dir="ltr">F<sub>3</sub>(G) = 7</b> היה מינימלי ולכן קטן או שווה לממוצע 6 העבודות הראשונות (<b dir="ltr">22/3 = 7⅓</b>). למטה מוצגת <b>ההוכחה הכללית לכל פתרון <span dir="ltr">S<sup>*</sup> ∈ S</span></b> לצד <b>הצבת המספרים של הדוגמה</b>.',
+    formula: 'q(G) = 13  ≤  Avg + (1 − 1/3)·t<sub>7</sub> = 9⅓ + 4 = 13⅓  ≤  (5/3)·q(S<sup>*</sup>) = <span class="Chosen">16⅔</span>',
+    proofType: 'unsorted'
+  });
+
+  // Steps 10..11 (Chapter 3): Tight Worst-Case Example for Unsorted Greedy (general k)
+  steps.push({
+    chapter: 3,
+    tag: '3. הדוקות הניתוח לחמדן ללא מיון לכל <span dir="ltr">k</span> — הרצת החמדן ללא מיון',
+    mode: 'tight_unsorted',
+    explain: `<b>קלט הקצה ההדוק לחמדן ללא מיון (כעת מוצג עבור <span dir="ltr">k = ${tightK}</span>):</b> <b dir="ltr">k(k−1) = ${tightK*(tightK-1)}</b> עבודות קטנות באורך <b>1</b> (בכחול), ואחריהן עבודה אחת גדולה באורך <b dir="ltr">k = ${tightK}</b> (באדום). החמדן הלא-ממוין מחלק את העבודות הקטנות שווה בשווה (עומס <b dir="ltr">k−1 = ${tightK-1}</b> בכל מכונה), ואז מוסיף את העבודה הגדולה (<b>${tightK}</b>) לאחת המכונות ומגיע לעומס <b dir="ltr">2k − 1 = ${2*tightK - 1}</b>.`,
+    formula: `q(G) = (k − 1) + k = 2k − 1 = <span class="Chosen">${2*tightK - 1}</span>`
+  });
+
+  steps.push({
+    chapter: 3,
+    tag: '3. הדוקות הניתוח לחמדן ללא מיון לכל <span dir="ltr">k</span> — האופטימום (והחמדן הממוין) מול החמדן',
+    mode: 'tight_compare',
+    explain: `בפתרון האופטימלי (וכן ב-<b><span dir="ltr">LPT</span> הממוין</b>, שמשבץ את העבודה האדומה באורך <b dir="ltr">k = ${tightK}</b> ראשונה), העבודה הגדולה מקבלת מכונה משלה, ו-<b>${tightK*(tightK-1)}</b> העבודות באורך 1 מתחלקות בין <b>${tightK-1}</b> המכונות הנותרות (<b>${tightK}</b> לכל מכונה). לכן <b dir="ltr">q(S<sup>*</sup>) = k = ${tightK}</b>, והיחס של החמדן הלא-ממוין הוא <b>בדיוק <span dir="ltr">2 − 1/k</span></b> — וזהו המניע המרכזי למיון המשימות ב-<span dir="ltr">LPT</span>!`,
+    formula: `q(G) / q(S<sup>*</sup>) = (2k − 1) / k = 2 − 1/k = <span class="Chosen">${2*tightK - 1}/${tightK} = ${(2 - 1/tightK).toFixed(3)}</span>   (while LPT = <span class="Good">${tightK} = OPT</span>)`
+  });
+
+  // Step 12 (Chapter 4): Sorting + Pigeonhole Principle Lemma
+  steps.push({
+    chapter: 4,
+    tag: '4. אלגוריתם <span dir="ltr">LPT</span> — מיון המשימות ולמת שובך היונים',
+    mode: 'sort_intro',
+    upTo: 0,
+    explain: 'באלגוריתם <b><span dir="ltr">LPT</span> (חמדן ממוין)</b> ממיינים תחילה את אותן 7 משימות מהגדולה לקטנה: <b dir="ltr">6, 5, 4, 4, 3, 3, 3</b>. לפי <b>עיקרון שובך היונים</b> על <b dir="ltr">k+1 = 4</b> העבודות הראשונות (המוקפות במסגרת זהב: <b dir="ltr">6, 5, 4, 4</b>), כל פתרון <b dir="ltr">S ∈ S</b> חייב לשבץ לפחות שתיים מהן לאותה מכונה, ולכן <b dir="ltr">q(S) ≥ 2·t<sub>4</sub> = 8</b> — ובפרט לכל <span dir="ltr">ℓ &gt; 3</span> מתקיים <b dir="ltr">t<sub>ℓ</sub> ≤ ½·q(S<sup>*</sup>) = 5</b>.',
+    formula: 'k + 1 = 4 jobs on k = 3 machines  ⇒  ∀S: q(S) ≥ t<sub>3</sub> + t<sub>4</sub> ≥ 2·t<sub>4</sub> = 8  ⇒  t<sub>ℓ</sub> ≤ ½·q(S<sup>*</sup>)  (∀ ℓ > 3)'
+  });
+
+  // Steps 13..19 (Chapter 4): Step-by-step Sorted Greedy (LPT)
+  for (let s = 1; s <= 7; s++) {
+    const prevMachines = buildPrefixMachines(SORTED_JOBS, SORTED_ASSIGNMENTS, s - 1);
+    const prevLoads = getLoads(prevMachines);
+    const chosenM = SORTED_ASSIGNMENTS[s - 1];
+    const jobLen = SORTED_JOBS[s - 1];
+    const newLoads = [...prevLoads];
+    newLoads[chosenM] += jobLen;
+    const minVal = prevLoads[chosenM];
+
+    let extraNote = '';
+    if (s <= 3) {
+      extraNote = `שלב העבודות הגדולות (<b dir="ltr">j = ${s} ≤ k</b>): משימה באורך <b>${jobLen}</b> נכנסת למכונה ריקה <b dir="ltr">M${chosenM + 1}</b>. אם מכונה זו תישאר עם עבודה יחידה בסוף, עומסה <span dir="ltr">≤ t<sub>1</sub> ≤ q(S<sup>*</sup>)</span>.`;
+    } else if (s === 4) {
+      extraNote = `משימה <b dir="ltr">j = 4 = k+1</b> (באורך <b>4</b>, טורקיז): העומסים הם <span dir="ltr">(6, 5, 4)</span>, ולכן היא משובצת ל-<b dir="ltr">M3</b> (עומס 4) ועולה ל-8. מכאן ואילך כל משימה מקיימת <b dir="ltr">t<sub>j</sub> ≤ t<sub>4</sub> = 4 ≤ ½·q(S<sup>*</sup>) = 5</b>.`;
+    } else if (s === 5) {
+      extraNote = `משימה <b dir="ltr">j = 5</b> (באורך <b>3</b>, כחול): העומסים הם <span dir="ltr">(6, 5, 8)</span>. המכונה הפנויה ביותר היא <b dir="ltr">M2</b> (עומס 5), והעומס שלה עולה ל-8.`;
+    } else if (s === 6) {
+      extraNote = `משימה <b dir="ltr">j = 6</b> (באורך <b>3</b>, כחול): העומסים הם <span dir="ltr">(6, 8, 8)</span>. המכונה הפנויה ביותר היא <b dir="ltr">M1</b> (עומס 6), והעומס שלה עולה ל-9.`;
+    } else if (s === 7) {
+      extraNote = `<b>משימה אחרונה <span dir="ltr">j = 7</span> (באורך 3 בלבד, כחול):</b> העומסים לפני השיבוץ הם <span dir="ltr">(9, 8, 8)</span>. משבצים ל-<b dir="ltr">M3</b> (עומס 8) ומקבלים <b dir="ltr">q(G<sub>LPT</sub>) = 11</b> — שיפור לעומת 13 ללא מיון (והאופטימום הוא 10).`;
+    }
+
+    steps.push({
+      chapter: 4,
+      tag: `חמדן ממוין (<span dir="ltr">LPT</span>) — משימה <span dir="ltr">j = ${s}</span>`,
+      mode: 'sorted_run',
+      upTo: s,
+      prevLoads,
+      chosenM,
+      explain: extraNote,
+      formula: `min(T<sub>1</sub>, T<sub>2</sub>, T<sub>3</sub>) = min(${prevLoads.join(', ')}) = ${minVal}  ⇒  M${chosenM + 1}: ${minVal} + ${jobLen} = <span class="Good">${newLoads[chosenM]}</span>`
+    });
+  }
+
+  // Step 20 (Chapter 5): Proof Insight for Sorted Greedy LPT (Lemma + Corollary) + Instantiation
+  steps.push({
+    chapter: 5,
+    tag: '5. הוכחת הקירוב ל-<span dir="ltr">LPT</span>: <span dir="ltr">(3/2 − 1/(2k))</span> והצבה בדוגמה',
+    mode: 'proof_sorted',
+    upTo: 7,
+    explain: 'ב-<b><span dir="ltr">LPT</span></b>, המכונה העמוסה ביותר היא <b dir="ltr">i<sup>*</sup> = 3</b> (<b dir="ltr">q(G<sub>LPT</sub>) = 11</b>) והעבודה האחרונה בה היא <b dir="ltr">ℓ = 7 (t<sub>7</sub> = 3)</b>. מכיוון ש-<span dir="ltr">ℓ = 7 &gt; k = 3</span>, <b>למת שובך היונים</b> מבטיחה לכל <span dir="ltr">S<sup>*</sup> ∈ S</span> כי <b dir="ltr">t<sub>7</sub> ≤ t<sub>4</sub> ≤ ½·q(S<sup>*</sup>)</b> (כלומר <span dir="ltr">3 ≤ 4 ≤ 5</span>). למטה מוצגת <b>ההוכחה הכללית</b> לצד <b>הצבת המספרים של הדוגמה</b>.',
+    formula: 'q(G<sub>LPT</sub>) = 11  ≤  Avg + (2/3)·t<sub>7</sub> = 9⅓ + 2 = 11⅓  ≤  (4/3)·q(S<sup>*</sup>) = <span class="Good">13⅓</span>',
+    proofType: 'sorted'
+  });
+
+  // Step 21 (Chapter 6): Full 3-way comparison (OPT vs Unsorted Greedy vs Sorted Greedy)
+  steps.push({
+    chapter: 6,
+    tag: '6. סיכום והשוואת שלושת הפתרונות על אותו קלט (<span dir="ltr">k = 3</span>)',
+    mode: 'compare_all',
+    explain: 'ארבעה ערכים שונים שממחישים את כל התמונה על אותן 7 משימות (<b dir="ltr">3, 3, 3, 4, 5, 4, 6</b>): <b>הממוצע (<span dir="ltr">Avg = 9⅓</span>)</b>, <b>הפתרון האופטימלי (<span dir="ltr">OPT = 10</span>)</b>, <b>החמדן הממוין <span dir="ltr">LPT (11)</span></b>, ו<b>החמדן הלא-ממוין (<span dir="ltr">13</span>)</b>. שימו לב כיצד צבעי המשימות מראים בדיוק לאן שובצה כל משימה בכל אחד משלושת הפתרונות.',
+    formula: '<span style="color:var(--blue-avg);font-weight:700">Avg = 9⅓</span>  &lt;  <span class="Good">OPT = 10</span>  &lt;  <span style="color:var(--navy);font-weight:700">LPT = 11 (≤ 13⅓)</span>  &lt;  <span class="Chosen">Unsorted = 13 (≤ 16⅔)</span>'
+  });
+
+  return steps;
+}
+
+// ============================================================================
+// SVG Schedule Renderer (with TWO distinct reference lines: Avg & OPT!)
+// ============================================================================
+function renderScheduleSVG(machines, opts = {}) {
+  const k = machines.length;
+  const maxAxis = opts.maxAxis || 14;
+  const avgBound = opts.avgBound !== undefined ? opts.avgBound : AVG_MAIN;
+  const optBound = opts.optBound !== undefined ? opts.optBound : OPT_MAIN;
+  const bracketMode = opts.bracketMode || null; // 'unsorted' | 'sorted' | null
+  const highlightMinIdx = opts.highlightMinIdx !== undefined ? opts.highlightMinIdx : -1;
+
+  const W = opts.width || 680;
+  const rowH = opts.compact ? 36 : 44;
+  const topPad = 38;
+  const bottomPad = bracketMode ? 68 : 34;
+  const H = topPad + k * rowH + bottomPad;
+  const leftX = 64;
+  const rightPad = 62;
+  const plotW = W - leftX - rightPad;
+  const scale = plotW / maxAxis;
+
+  let svg = `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">`;
+
+  // Time axis grid lines & ticks
+  for (let t = 0; t <= maxAxis; t++) {
+    const x = leftX + t * scale;
+    svg += `<line x1="${x.toFixed(1)}" y1="${topPad - 4}" x2="${x.toFixed(1)}" y2="${topPad + k * rowH}" stroke="#eef0f4" stroke-width="1"/>`;
+    if (maxAxis <= 15 || t % 2 === 0 || t === maxAxis) {
+      svg += `<text x="${x.toFixed(1)}" y="${topPad + k * rowH + 19}" text-anchor="middle" font-size="13.5" font-weight="700" fill="#5a6270">${t}</text>`;
+    }
+  }
+
+  // Distinct Line 1: Average Load (Avg = 9⅓) when different from OPT
+  const showTwoLines = (avgBound > 0 && Math.abs(optBound - avgBound) > 0.05);
+  if (showTwoLines && avgBound <= maxAxis) {
+    const avgX = leftX + avgBound * scale;
+    svg += `<line x1="${avgX.toFixed(1)}" y1="${topPad - 10}" x2="${avgX.toFixed(1)}" y2="${topPad + k * rowH + 4}" stroke="#1d6fa5" stroke-width="2.2" stroke-dasharray="4 3"/>`;
+    svg += `<text x="${(avgX - 6).toFixed(1)}" y="${topPad - 14}" text-anchor="end" font-size="13.5" font-weight="700" fill="#1d6fa5">${opts.avgLabel || 'Avg = 9⅓'}</text>`;
+  }
+
+  // Distinct Line 2: Optimal Load (OPT = 10)
+  if (optBound > 0 && optBound <= maxAxis) {
+    const optX = leftX + optBound * scale;
+    svg += `<line x1="${optX.toFixed(1)}" y1="${topPad - 10}" x2="${optX.toFixed(1)}" y2="${topPad + k * rowH + 4}" stroke="#2b7a4b" stroke-width="2.4" stroke-dasharray="6 3"/>`;
+    const anchor = showTwoLines ? 'start' : 'middle';
+    const labelX = showTwoLines ? (optX + 6) : optX;
+    svg += `<text x="${labelX.toFixed(1)}" y="${topPad - 14}" text-anchor="${anchor}" font-size="13.5" font-weight="700" fill="#2b7a4b">${opts.optLabel || `OPT = ${optBound}`}</text>`;
+  }
+
+  // Machine rows
+  const loads = getLoads(machines);
+  const maxLoad = Math.max(0, ...loads);
+
+  for (let i = 0; i < k; i++) {
+    const y = topPad + i * rowH;
+    const barH = rowH - 10;
+    const isMinTarget = (i === highlightMinIdx);
+
+    // Machine label
+    svg += `<text x="${leftX - 12}" y="${y + barH / 2 + 5}" text-anchor="end" font-size="15" font-weight="700" fill="${isMinTarget ? '#b23b3b' : '#16325c'}">M${i + 1}</text>`;
+
+    // Empty track background
+    svg += `<rect x="${leftX}" y="${y}" width="${plotW}" height="${barH}" fill="${isMinTarget ? '#fdf7e7' : '#f6f7f9'}" stroke="${isMinTarget ? '#c8a44d' : '#e5e7eb'}" stroke-width="1.2" rx="4"/>`;
+
+    // Stacked job blocks (colored consistently by job size!)
+    let curT = 0;
+    const mJobs = machines[i];
+    for (let b = 0; b < mJobs.length; b++) {
+      const jb = mJobs[b];
+      const bx = leftX + curT * scale;
+      const bw = jb.len * scale;
+      curT += jb.len;
+
+      const cObj = getJobColor(jb.len, jb.isBigTight);
+      const fill = cObj.fill;
+      const isHighlighted = (jb.isLatest || (bracketMode && i === 2 && b === mJobs.length - 1));
+
+      svg += `<rect x="${bx.toFixed(1)}" y="${y}" width="${bw.toFixed(1)}" height="${barH}" fill="${fill}" stroke="#ffffff" stroke-width="1.8" rx="4"/>`;
+      if (isHighlighted) {
+        svg += `<rect x="${(bx + 1.5).toFixed(1)}" y="${(y + 1.5).toFixed(1)}" width="${Math.max(0, bw - 3).toFixed(1)}" height="${barH - 3}" fill="none" stroke="#ffd166" stroke-width="3" rx="3"/>`;
+      }
+      if (bw >= 18) {
+        const lbl = jb.label !== undefined ? jb.label : jb.len;
+        svg += `<text x="${(bx + bw / 2).toFixed(1)}" y="${y + barH / 2 + 5}" text-anchor="middle" font-size="14.5" font-weight="700" fill="#ffffff">${lbl}</text>`;
+      }
+    }
+
+    // Total load label at end of bar
+    const totalX = leftX + curT * scale + 9;
+    const isMax = (curT === maxLoad && maxLoad > 0);
+    const loadColor = isMax ? (curT > optBound ? '#b23b3b' : '#2b7a4b') : '#1c1c1c';
+    svg += `<text x="${totalX.toFixed(1)}" y="${y + barH / 2 + 5}" text-anchor="start" font-size="15.5" font-weight="700" fill="${loadColor}">${curT}</text>`;
+  }
+
+  // Proof decomposition brackets on M3 (Steps 9 and 18)
+  if (bracketMode === 'unsorted') {
+    const yBr = topPad + 3 * rowH + 32;
+    const x0 = leftX;
+    const xMid = leftX + 7 * scale;
+    const xEnd = leftX + 13 * scale;
+
+    svg += `<line x1="${x0}" y1="${yBr}" x2="${xMid - 2}" y2="${yBr}" stroke="#16325c" stroke-width="2.8"/>`;
+    svg += `<line x1="${x0}" y1="${yBr - 6}" x2="${x0}" y2="${yBr + 6}" stroke="#16325c" stroke-width="2.2"/>`;
+    svg += `<line x1="${xMid - 2}" y1="${yBr - 6}" x2="${xMid - 2}" y2="${yBr + 6}" stroke="#16325c" stroke-width="2.2"/>`;
+    svg += `<text x="${(x0 + xMid) / 2}" y="${yBr + 20}" text-anchor="middle" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#16325c"><tspan font-style="italic">F</tspan><tspan baseline-shift="sub" font-size="75%">3</tspan>(<tspan font-style="italic">G</tspan>) = 7 ≤ 22/3 &lt; Avg = 9⅓ ≤ <tspan font-style="italic">q</tspan>(<tspan font-style="italic">S</tspan><tspan baseline-shift="super" font-size="75%">*</tspan>)</text>`;
+
+    svg += `<line x1="${xMid + 2}" y1="${yBr}" x2="${xEnd}" y2="${yBr}" stroke="#b23b3b" stroke-width="2.8"/>`;
+    svg += `<line x1="${xMid + 2}" y1="${yBr - 6}" x2="${xMid + 2}" y2="${yBr + 6}" stroke="#b23b3b" stroke-width="2.2"/>`;
+    svg += `<line x1="${xEnd}" y1="${yBr - 6}" x2="${xEnd}" y2="${yBr + 6}" stroke="#b23b3b" stroke-width="2.2"/>`;
+    svg += `<text x="${(xMid + xEnd) / 2}" y="${yBr + 20}" text-anchor="middle" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#b23b3b"><tspan font-style="italic">t</tspan><tspan baseline-shift="sub" font-size="75%">7</tspan> = 6 ≤ <tspan font-style="italic">t</tspan><tspan baseline-shift="sub" font-size="75%">max</tspan> = 6 ≤ <tspan font-style="italic">q</tspan>(<tspan font-style="italic">S</tspan><tspan baseline-shift="super" font-size="75%">*</tspan>) = 10</text>`;
+  } else if (bracketMode === 'sorted') {
+    const yBr = topPad + 3 * rowH + 32;
+    const x0 = leftX;
+    const xMid = leftX + 8 * scale;
+    const xEnd = leftX + 11 * scale;
+
+    svg += `<line x1="${x0}" y1="${yBr}" x2="${xMid - 2}" y2="${yBr}" stroke="#16325c" stroke-width="2.8"/>`;
+    svg += `<line x1="${x0}" y1="${yBr - 6}" x2="${x0}" y2="${yBr + 6}" stroke="#16325c" stroke-width="2.2"/>`;
+    svg += `<line x1="${xMid - 2}" y1="${yBr - 6}" x2="${xMid - 2}" y2="${yBr + 6}" stroke="#16325c" stroke-width="2.2"/>`;
+    svg += `<text x="${(x0 + xMid) / 2}" y="${yBr + 20}" text-anchor="middle" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#16325c"><tspan font-style="italic">F</tspan><tspan baseline-shift="sub" font-size="75%">3</tspan>(<tspan font-style="italic">G</tspan><tspan baseline-shift="sub" font-size="75%">LPT</tspan>) = 8 ≤ 25/3 = 8⅓ &lt; Avg = 9⅓ ≤ <tspan font-style="italic">q</tspan>(<tspan font-style="italic">S</tspan><tspan baseline-shift="super" font-size="75%">*</tspan>)</text>`;
+
+    svg += `<line x1="${xMid + 2}" y1="${yBr}" x2="${xEnd}" y2="${yBr}" stroke="#2b7a4b" stroke-width="2.8"/>`;
+    svg += `<line x1="${xMid + 2}" y1="${yBr - 6}" x2="${xMid + 2}" y2="${yBr + 6}" stroke="#2b7a4b" stroke-width="2.2"/>`;
+    svg += `<line x1="${xEnd}" y1="${yBr - 6}" x2="${xEnd}" y2="${yBr + 6}" stroke="#2b7a4b" stroke-width="2.2"/>`;
+    svg += `<text x="${(xMid + xEnd) / 2 + 30}" y="${yBr + 20}" text-anchor="middle" font-family="Georgia, serif" font-size="14" font-weight="700" fill="#2b7a4b"><tspan font-style="italic">t</tspan><tspan baseline-shift="sub" font-size="75%">7</tspan> = 3 ≤ <tspan font-style="italic">t</tspan><tspan baseline-shift="sub" font-size="75%">4</tspan> = 4 ≤ ½·<tspan font-style="italic">q</tspan>(<tspan font-style="italic">S</tspan><tspan baseline-shift="super" font-size="75%">*</tspan>) = 5</text>`;
+  }
+
+  svg += `</svg>`;
+  return svg;
+}
+
+// ============================================================================
+// Render Proof + Example Instantiation Box (for Proof Steps 9 & 18)
+// ============================================================================
+function renderProofGridHTML(step) {
+  const pGrid = document.getElementById('proofGrid');
+  if (!step.proofType) {
+    pGrid.className = 'proof-grid';
+    pGrid.innerHTML = '';
+    return;
+  }
+
+  pGrid.className = 'proof-grid visible';
+  if (step.proofType === 'unsorted') {
+    pGrid.innerHTML = `
+      <div class="proof-card">
+        <div class="proof-card-title">ההוכחה הכללית — משפט ה-<span dir="ltr">(2 − 1/k)</span>-קירוב לכל פתרון <span dir="ltr">S<sup>*</sup> ∈ S</span></div>
+        <div class="proof-lines">
+          <div class="pline">
+            <span><b>q(G) = T<sub>i*</sub>(G) = F<sub>i*</sub>(G) + t<sub>ℓ</sub> = min<sub>r∈[k]</sub> F<sub>r</sub>(G) + t<sub>ℓ</sub></b></span>
+            <span class="p-reason">בחירת החמדן לפני משימה ℓ</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; (1/k) &sum;<sub>j=1..ℓ−1</sub> t<sub>j</sub> + t<sub>ℓ</sub> = (1/k) &sum;<sub>j=1..ℓ</sub> t<sub>j</sub> + (1 − 1/k) t<sub>ℓ</sub></b></span>
+            <span class="p-reason">המינימום &le; הממוצע</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; <span class="hl-blue">(1/k) &sum;<sub>j=1..n</sub> t<sub>j</sub></span> + (1 − 1/k) <span class="hl-red">t<sub>max</sub></span></b></span>
+            <span class="p-reason">הגדלת הסכום ו-<span dir="ltr">t<sub>ℓ</sub> &le; t<sub>max</sub></span></span>
+          </div>
+          <div class="pline">
+            <span><b>&le; <span class="hl-green">q(S<sup>*</sup>)</span> + (1 − 1/k) <span class="hl-green">q(S<sup>*</sup>)</span> = <span class="hl-red">(2 − 1/k) q(S<sup>*</sup>)</span></b></span>
+            <span class="p-reason">לכל <span dir="ltr">S<sup>*</sup> ∈ S</span> שני החסמים חלים</span>
+          </div>
+        </div>
+      </div>
+      <div class="proof-card inst-card">
+        <div class="proof-card-title">הצבה בדוגמה שלנו (<span dir="ltr">k=3, i<sup>*</sup>=3, ℓ=7, F<sub>3</sub>(G)=7, t<sub>7</sub>=6, OPT=10</span>)</div>
+        <div class="proof-lines">
+          <div class="pline">
+            <span><b>q(G) = T<sub>3</sub>(G) = F<sub>3</sub>(G) + t<sub>7</sub> = min(7, 8, 7) + 6 = <span class="hl-red">13</span></b></span>
+            <span class="p-reason">עומס <span dir="ltr">M3</span> לפני ואחרי משימה 7</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; 22/3 + 6 = 7⅓ + 6 = 28/3 + (2/3)&middot;6 = <span class="hl-navy">13⅓</span></b></span>
+            <span class="p-reason">ממוצע 6 הראשונות (<span dir="ltr">7 &le; 7⅓</span>)</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; <span class="hl-blue">Avg (9⅓)</span> + (2/3)&middot;<span class="hl-red">t<sub>max</sub> (6)</span> = 9⅓ + 4 = <span class="hl-navy">13⅓</span></b></span>
+            <span class="p-reason">כי <span dir="ltr">ℓ = n = 7</span> ו-<span dir="ltr">t<sub>7</sub> = t<sub>max</sub> = 6</span></span>
+          </div>
+          <div class="pline">
+            <span><b>&le; <span class="hl-green">10</span> + (2/3)&middot;<span class="hl-green">10</span> = (5/3)&middot;10 = <span class="hl-red">16⅔</span></b></span>
+            <span class="p-reason"><span dir="ltr">Avg = 9⅓ &le; 10</span> ו-<span dir="ltr">t<sub>max</sub> = 6 &le; 10</span></span>
+          </div>
+        </div>
+      </div>`;
+  } else if (step.proofType === 'sorted') {
+    pGrid.innerHTML = `
+      <div class="proof-card">
+        <div class="proof-card-title">ההוכחה הכללית עבור <span dir="ltr">LPT</span> לכל <span dir="ltr">S<sup>*</sup> ∈ S</span> (למה + משפט)</div>
+        <div class="proof-lines">
+          <div class="pline">
+            <span><b>Lemma (ℓ &gt; k): &nbsp; <span class="hl-green">q(S<sup>*</sup>)</span> &ge; t<sub>k</sub> + t<sub>k+1</sub> &ge; 2 t<sub>k+1</sub> &ge; 2 t<sub>ℓ</sub> &rArr; <span class="hl-green">t<sub>ℓ</sub> &le; &frac12; q(S<sup>*</sup>)</span></b></span>
+            <span class="p-reason">שובך היונים על <span dir="ltr">1..k+1</span></span>
+          </div>
+          <div class="pline">
+            <span><b>q(G<sub>LPT</sub>) = F<sub>i*</sub>(G) + t<sub>ℓ</sub> &le; (1/k) &sum;<sub>j=1..ℓ</sub> t<sub>j</sub> + (1 − 1/k) t<sub>ℓ</sub></b></span>
+            <span class="p-reason">כמו במשפט הקודם</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; <span class="hl-blue">(1/k) &sum;<sub>j=1..n</sub> t<sub>j</sub></span> + (1 − 1/k) t<sub>ℓ</sub></b></span>
+            <span class="p-reason">סכום חלקי &le; סכום מלא</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; <span class="hl-green">q(S<sup>*</sup>)</span> + (1 − 1/k)&middot;<span class="hl-green">&frac12; q(S<sup>*</sup>)</span> = <span class="hl-green">(3/2 − 1/(2k)) q(S<sup>*</sup>)</span></b></span>
+            <span class="p-reason">הצבת הלמה <span dir="ltr">t<sub>ℓ</sub> &le; &frac12; q(S<sup>*</sup>)</span></span>
+          </div>
+        </div>
+      </div>
+      <div class="proof-card inst-card">
+        <div class="proof-card-title">הצבה בדוגמה שלנו (<span dir="ltr">k=3, ℓ=7, F<sub>3</sub>(G<sub>LPT</sub>)=8, t<sub>4</sub>=4, t<sub>7</sub>=3, OPT=10</span>)</div>
+        <div class="proof-lines">
+          <div class="pline">
+            <span><b>Lemma (k+1=4): &nbsp; <span class="hl-green">OPT = 10</span> &ge; t<sub>3</sub>+t<sub>4</sub> = 8 &ge; 2 t<sub>7</sub> = 6 &rArr; <span class="hl-green">t<sub>7</sub> = 3 &le; 5</span></b></span>
+            <span class="p-reason">4 הראשונות: <span dir="ltr">(6, 5, 4, 4)</span></span>
+          </div>
+          <div class="pline">
+            <span><b>q(G<sub>LPT</sub>) = F<sub>3</sub>(G<sub>LPT</sub>) + t<sub>7</sub> = min(9, 8, 8) + 3 = <span class="hl-green">11</span></b></span>
+            <span class="p-reason">עומס <span dir="ltr">M3</span> לפני ואחרי משימה 7</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; 25/3 + 3 = 8⅓ + 3 = <span class="hl-blue">Avg (9⅓)</span> + (2/3)&middot;3 = <span class="hl-navy">11⅓</span></b></span>
+            <span class="p-reason">ממוצע 6 הראשונות (<span dir="ltr">8 &le; 8⅓</span>)</span>
+          </div>
+          <div class="pline">
+            <span><b>&le; <span class="hl-green">10</span> + (2/3)&middot;<span class="hl-green">5</span> = (4/3)&middot;10 = <span class="hl-green">13⅓</span></b></span>
+            <span class="p-reason">כי <span dir="ltr">Avg = 9⅓ &le; 10</span> ו-<span dir="ltr">t<sub>7</sub> = 3 &le; 5</span></span>
+          </div>
+        </div>
+      </div>`;
+  }
+}
+
+// ============================================================================
+// Render UI for Current Step
+// ============================================================================
+let currentStepIdx = 0;
+
+function renderQueueHTML(step) {
+  const qCard = document.getElementById('queueCard');
+
+  if (step.mode === 'tight_unsorted' || step.mode === 'tight_compare') {
+    const unitCount = tightK * (tightK - 1);
+    const cUnit = getJobColor(1, false);
+    const cBig  = getJobColor(tightK, true);
+    let pills = '';
+    const maxPillsShow = Math.min(unitCount, 12);
+    for (let i = 1; i <= maxPillsShow; i++) {
+      pills += `<div class="job-pill" style="width:42px;background:${cUnit.fill};border-color:${cUnit.border};"><span class="j-idx">#${i}</span><span class="j-val">1</span></div>`;
+    }
+    if (unitCount > maxPillsShow) {
+      pills += `<span style="font-weight:700;color:var(--muted);font-size:1.05rem;">... (${unitCount} עבודות באורך 1) ...</span>`;
+    }
+    pills += `<div class="job-pill current" style="width:${42 * tightK}px;background:${cBig.fill};border-color:${cBig.border};"><span class="j-idx">#${unitCount + 1} (אחרונה)</span><span class="j-val">${tightK}</span></div>`;
+
+    qCard.innerHTML = `
+      <div class="queue-row">
+        <div class="queue-label">קלט הקצה ההדוק עבור <span dir="ltr">k = ${tightK}</span>:</div>
+        <div class="job-pills">${pills}</div>
+      </div>
+      <div class="queue-stats-row">
+        <div class="size-legend">
+          <span>צבע ואורך לפי גודל משימה:</span>
+          <span class="legend-dot" style="background:${cUnit.fill}">אורך 1 (${unitCount}×)</span>
+          <span class="legend-dot" style="background:${cBig.fill}">אורך k = ${tightK} (1×)</span>
+        </div>
+        <div class="stats-badges">
+          <div class="stat-badge">n = ${unitCount + 1}</div>
+          <div class="stat-badge">∑ t<sub>j</sub> = ${tightK * tightK}</div>
+          <div class="stat-badge tmax-badge">t<sub>max</sub> = ${tightK} ≤ OPT</div>
+          <div class="stat-badge avg-badge">Avg = ${tightK} ≤ OPT</div>
+          <div class="stat-badge opt-badge">OPT = k = ${tightK}</div>
+        </div>
+      </div>`;
+    return;
+  }
+
+  const isSorted = (step.mode === 'sort_intro' || step.mode === 'sorted_run' || step.mode === 'proof_sorted');
+  const jobs = isSorted ? SORTED_JOBS : UNSORTED_JOBS;
+  const upTo = step.upTo !== undefined ? step.upTo : 7;
+
+  // Proportional width scale: 28px per time unit (3 -> 84px, 4 -> 112px, 5 -> 140px, 6 -> 168px)
+  const unitPx = 28;
+  let pills = '';
+  for (let i = 0; i < jobs.length; i++) {
+    const len = jobs[i];
+    const cObj = getJobColor(len, false);
+    let cls = 'job-pill';
+    let checkMark = '';
+    if (step.mode === 'sort_intro' && i < 4) {
+      cls += ' pigeon';
+    } else if (step.mode === 'unsorted_run' || step.mode === 'sorted_run') {
+      if (i + 1 < upTo) {
+        cls += ' done';
+        checkMark = ' ✓';
+      } else if (i + 1 === upTo) {
+        cls += ' current';
+      }
+    }
+    const wPx = len * unitPx;
+    pills += `<div class="${cls}" style="width:${wPx}px;background:${cObj.fill};border-color:${cObj.border};"><span class="j-idx">j=${i + 1}${checkMark}</span><span class="j-val">${len}</span></div>`;
+  }
+
+  const labelText = isSorted
+    ? 'תור המשימות הממוין (<span dir="ltr">LPT: t<sub>1</sub> ≥ … ≥ t<sub>7</sub></span>):'
+    : 'תור המשימות המקורי (ללא מיון):';
+
+  qCard.innerHTML = `
+    <div class="queue-row">
+      <div class="queue-label">${labelText}</div>
+      <div class="job-pills">${pills}</div>
+    </div>
+    <div class="queue-stats-row">
+      <div class="size-legend">
+        <span>צבע ורוחב לפי גודל משימה:</span>
+        <span class="legend-dot" style="background:${JOB_SIZE_COLORS[3].fill}">אורך 3</span>
+        <span class="legend-dot" style="background:${JOB_SIZE_COLORS[4].fill}">אורך 4</span>
+        <span class="legend-dot" style="background:${JOB_SIZE_COLORS[5].fill}">אורך 5</span>
+        <span class="legend-dot" style="background:${JOB_SIZE_COLORS[6].fill}">אורך 6</span>
+      </div>
+      <div class="stats-badges">
+        <div class="stat-badge">k = 3 , n = 7</div>
+        <div class="stat-badge">∑ t<sub>j</sub> = 28</div>
+        <div class="stat-badge tmax-badge">t<sub>max</sub> = 6 ≤ OPT</div>
+        <div class="stat-badge avg-badge">Avg = 28/3 = 9⅓ ≤ OPT</div>
+        <div class="stat-badge opt-badge">OPT = q(S<sup>*</sup>) = 10</div>
+      </div>
+    </div>`;
+}
+
+function renderPanelsHTML(step) {
+  const container = document.getElementById('panelsContainer');
+  container.className = 'panels';
+
+  if (step.mode === 'show_opt') {
+    const svg = renderScheduleSVG(OPT_MACHINES, {
+      maxAxis: 14,
+      avgBound: AVG_MAIN,
+      optBound: OPT_MAIN
+    });
+    container.innerHTML = `
+      <div class="panel highlight-panel">
+        <div class="panel-head">
+          <div class="panel-title">הפתרון האופטימלי <span dir="ltr">S<sup>*</sup></span> (חלוקה: <span dir="ltr">{6,3}=9, {5,4}=9, {4,3,3}=10</span>) — שימו לב ש-<span dir="ltr">OPT = 10</span> גדול ממש מהממוצע <span dir="ltr">Avg = 9⅓</span></div>
+          <div class="panel-score" style="color:var(--green)">
+            <span style="color:var(--red)">t<sub>max</sub> = 6 ≤ OPT</span> &nbsp;|&nbsp; <span style="color:var(--blue-avg)">Avg = 9⅓ ≤ OPT</span> &nbsp;|&nbsp; q(S<sup>*</sup>) = OPT = 10
+          </div>
+        </div>
+        ${svg}
+      </div>`;
+  } else if (step.mode === 'unsorted_run' || step.mode === 'proof_unsorted') {
+    const machines = buildPrefixMachines(UNSORTED_JOBS, UNSORTED_ASSIGNMENTS, step.upTo);
+    const loads = getLoads(machines);
+    const curMakespan = Math.max(...loads);
+    const svg = renderScheduleSVG(machines, {
+      maxAxis: 14,
+      avgBound: AVG_MAIN,
+      optBound: OPT_MAIN,
+      bracketMode: step.mode === 'proof_unsorted' ? 'unsorted' : null,
+      highlightMinIdx: step.chosenM,
+      compact: step.mode === 'proof_unsorted',
+      width: step.mode === 'proof_unsorted' ? 960 : 680
+    });
+    container.innerHTML = `
+      <div class="panel highlight-panel ${(step.mode === 'proof_unsorted' || step.mode === 'proof_sorted') ? 'proof-panel' : ''}">
+        <div class="panel-head">
+          <div class="panel-title">אלגוריתם 1: חמדן ללא מיון (<span dir="ltr">List Scheduling — Online</span>) — צעד ${step.upTo} מתוך 7</div>
+          <div class="panel-score" style="color:${curMakespan > OPT_MAIN ? 'var(--red)' : 'var(--navy)'}">
+            q(G) = ${curMakespan} &nbsp; (OPT = 10 , Avg = 9⅓)
+          </div>
+        </div>
+        ${svg}
+      </div>`;
+  } else if (step.mode === 'sort_intro' || step.mode === 'sorted_run') {
+    container.className = 'panels two-col';
+    const sortedMachines = buildPrefixMachines(SORTED_JOBS, SORTED_ASSIGNMENTS, step.upTo);
+    const unsortedFull = buildPrefixMachines(UNSORTED_JOBS, UNSORTED_ASSIGNMENTS, 7);
+    const sortedLoads = getLoads(sortedMachines);
+    const curSortedMax = Math.max(...sortedLoads);
+
+    const svgSorted = renderScheduleSVG(sortedMachines, {
+      maxAxis: 14,
+      avgBound: AVG_MAIN,
+      optBound: OPT_MAIN,
+      highlightMinIdx: step.chosenM,
+      width: 600
+    });
+    const svgUnsorted = renderScheduleSVG(unsortedFull, {
+      maxAxis: 14,
+      avgBound: AVG_MAIN,
+      optBound: OPT_MAIN,
+      width: 600
+    });
+
+    container.innerHTML = `
+      <div class="panel highlight-panel">
+        <div class="panel-head">
+          <div class="panel-title">אלגוריתם 2: חמדן ממוין (<span dir="ltr">LPT — Offline</span>) — צעד ${step.upTo} מתוך 7</div>
+          <div class="panel-score" style="color:var(--green)">q(G<sub>LPT</sub>) = ${curSortedMax}</div>
+        </div>
+        ${svgSorted}
+      </div>
+      <div class="panel">
+        <div class="panel-head">
+          <div class="panel-title">להשוואה: תוצאת החמדן ללא מיון על אותו קלט</div>
+          <div class="panel-score" style="color:var(--red)">q(G) = 13</div>
+        </div>
+        ${svgUnsorted}
+      </div>`;
+  } else if (step.mode === 'proof_sorted') {
+    const sortedFull = buildPrefixMachines(SORTED_JOBS, SORTED_ASSIGNMENTS, 7);
+    const svgSorted = renderScheduleSVG(sortedFull, {
+      maxAxis: 14,
+      avgBound: AVG_MAIN,
+      optBound: OPT_MAIN,
+      bracketMode: 'sorted',
+      compact: true,
+      width: 960
+    });
+    container.innerHTML = `
+      <div class="panel highlight-panel proof-panel">
+        <div class="panel-head">
+          <div class="panel-title">אלגוריתם 2: חמדן ממוין (<span dir="ltr">LPT</span>) — המכונה העמוסה <span dir="ltr">i<sup>*</sup> = 3</span> והעבודה האחרונה <span dir="ltr">ℓ = 7 (t<sub>7</sub> = 3 ≤ ½·q(S<sup>*</sup>) = 5)</span></div>
+          <div class="panel-score" style="color:var(--green)">q(G<sub>LPT</sub>) = 11 &nbsp; (OPT = 10 , Avg = 9⅓)</div>
+        </div>
+        ${svgSorted}
+      </div>`;
+  } else if (step.mode === 'compare_all') {
+    container.className = 'panels two-col';
+    const sortedFull = buildPrefixMachines(SORTED_JOBS, SORTED_ASSIGNMENTS, 7);
+    const unsortedFull = buildPrefixMachines(UNSORTED_JOBS, UNSORTED_ASSIGNMENTS, 7);
+
+    const svgOpt = renderScheduleSVG(OPT_MACHINES, { maxAxis: 14, avgBound: AVG_MAIN, optBound: OPT_MAIN, width: 600, compact: true });
+    const svgSorted = renderScheduleSVG(sortedFull, { maxAxis: 14, avgBound: AVG_MAIN, optBound: OPT_MAIN, width: 600, compact: true });
+    const svgUnsorted = renderScheduleSVG(unsortedFull, { maxAxis: 14, avgBound: AVG_MAIN, optBound: OPT_MAIN, width: 1220, compact: true });
+
+    container.innerHTML = `
+      <div class="panel highlight-panel">
+        <div class="panel-head">
+          <div class="panel-title">1. פתרון אופטימלי <span dir="ltr">S<sup>*</sup></span> (עומסים: <span dir="ltr">9, 9, 10</span> — בעוד <span dir="ltr">Avg = 9⅓</span>)</div>
+          <div class="panel-score" style="color:var(--green)">q(S<sup>*</sup>) = OPT = 10</div>
+        </div>
+        ${svgOpt}
+      </div>
+      <div class="panel highlight-panel">
+        <div class="panel-head">
+          <div class="panel-title">2. חמדן ממוין <span dir="ltr">LPT</span> (סדר: <span dir="ltr">6, 5, 4, 4, 3, 3, 3</span> — עומסים: <span dir="ltr">9, 8, 11</span>)</div>
+          <div class="panel-score" style="color:var(--navy)">q(G<sub>LPT</sub>) = 11 ≤ (4/3)·10 = 13⅓</div>
+        </div>
+        ${svgSorted}
+      </div>
+      <div class="panel" style="grid-column: 1 / -1;">
+        <div class="panel-head">
+          <div class="panel-title">3. חמדן ללא מיון <span dir="ltr">List Scheduling</span> (סדר: <span dir="ltr">3, 3, 3, 4, 5, 4, 6</span> — העבודה 6 נוחתת אחרונה ב-<span dir="ltr">M3</span>)</div>
+          <div class="panel-score" style="color:var(--red)">q(G) = 13 ≤ (5/3)·10 = 16⅔</div>
+        </div>
+        ${svgUnsorted}
+      </div>`;
+  } else if (step.mode === 'tight_unsorted' || step.mode === 'tight_compare') {
+    const k = tightK;
+    const maxAxis = 2 * k;
+    const unsortedM = Array.from({ length: k }, (_, idx) => {
+      const arr = Array.from({ length: k - 1 }, () => ({ len: 1, label: '1' }));
+      if (idx === 0) arr.push({ len: k, label: `${k} (last)`, isLatest: true, isBigTight: true });
+      return arr;
+    });
+
+    const optM = Array.from({ length: k }, (_, idx) => {
+      if (idx === 0) return [{ len: k, label: `${k} (first)`, isBigTight: true }];
+      return Array.from({ length: k }, () => ({ len: 1, label: '1' }));
+    });
+
+    if (step.mode === 'tight_unsorted') {
+      const svgU = renderScheduleSVG(unsortedM, {
+        maxAxis,
+        avgBound: k,
+        optBound: k,
+        optLabel: `OPT = Avg = k = ${k}`
+      });
+      container.innerHTML = `
+        <div class="panel highlight-panel">
+          <div class="panel-head">
+            <div class="panel-title">הרצת החמדן ללא מיון על קלט הקצה עבור <span dir="ltr">k = ${k}</span>: תחילה <span dir="ltr">${k*(k-1)}</span> עבודות של 1, ובסוף עבודה באורך <span dir="ltr">${k}</span></div>
+            <div class="panel-score" style="color:var(--red)">q(G) = (k − 1) + k = 2k − 1 = ${2*k - 1}</div>
+          </div>
+          ${svgU}
+        </div>`;
+    } else {
+      container.className = 'panels two-col';
+      const svgU = renderScheduleSVG(unsortedM, {
+        maxAxis,
+        avgBound: k,
+        optBound: k,
+        optLabel: `OPT = ${k}`,
+        width: 600
+      });
+      const svgO = renderScheduleSVG(optM, {
+        maxAxis,
+        avgBound: k,
+        optBound: k,
+        optLabel: `OPT = ${k}`,
+        width: 600
+      });
+      container.innerHTML = `
+        <div class="panel">
+          <div class="panel-head">
+            <div class="panel-title">חמדן ללא מיון (עבודה באורך <span dir="ltr">${k}</span> מגיעה אחרונה)</div>
+            <div class="panel-score" style="color:var(--red)">q(G) = 2k − 1 = ${2*k - 1}</div>
+          </div>
+          ${svgU}
+        </div>
+        <div class="panel highlight-panel">
+          <div class="panel-head">
+            <div class="panel-title">הפתרון האופטימלי <span dir="ltr">S<sup>*</sup></span> וגם החמדן הממוין <span dir="ltr">LPT</span> (עבודה <span dir="ltr">${k}</span> משובצת ראשונה)</div>
+            <div class="panel-score" style="color:var(--green)">q(S<sup>*</sup>) = q(G<sub>LPT</sub>) = k = ${k}</div>
+          </div>
+          ${svgO}
+        </div>`;
+    }
+  }
+}
+
+function showStep(idx, pushHash = true) {
+  const steps = buildSteps();
+  currentStepIdx = Math.max(0, Math.min(steps.length - 1, idx));
+  const st = steps[currentStepIdx];
+
+  renderQueueHTML(st);
+  renderPanelsHTML(st);
+  renderProofGridHTML(st);
+
+  document.getElementById('stepTag').innerHTML = st.tag;
+  document.getElementById('explainText').innerHTML = st.explain;
+  document.getElementById('formulaBox').innerHTML = st.formula;
+  document.getElementById('counter').textContent = `${currentStepIdx + 1} / ${steps.length}`;
+
+  document.getElementById('prevBtn').disabled = (currentStepIdx === 0);
+  document.getElementById('nextBtn').disabled = (currentStepIdx === steps.length - 1);
+
+  document.querySelectorAll('.chap-btn').forEach((btn, cIdx) => {
+    btn.classList.toggle('active', cIdx === st.chapter);
+  });
+
+  document.getElementById('kSelector').classList.toggle('visible', st.chapter === 3);
+
+  if (pushHash) {
+    history.replaceState(null, '', `#step=${currentStepIdx}`);
+  }
+}
+
+// Navigation listeners
+document.getElementById('nextBtn').addEventListener('click', () => showStep(currentStepIdx + 1));
+document.getElementById('prevBtn').addEventListener('click', () => showStep(currentStepIdx - 1));
+document.getElementById('resetBtn').addEventListener('click', () => showStep(0));
+
+document.querySelectorAll('.chap-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    showStep(parseInt(btn.getAttribute('data-jump'), 10));
+  });
+});
+
+document.querySelectorAll('.k-btn').forEach(btn => {
+  btn.addEventListener('click', () => {
+    tightK = parseInt(btn.getAttribute('data-k'), 10);
+    document.querySelectorAll('.k-btn').forEach(b => b.classList.toggle('active', b === btn));
+    showStep(currentStepIdx, false);
+  });
+});
+
+window.addEventListener('keydown', e => {
+  if (e.key === 'ArrowRight' || e.key === ' ' || e.key === 'Enter') {
+    e.preventDefault();
+    showStep(currentStepIdx + 1);
+  } else if (e.key === 'ArrowLeft' || e.key === 'Backspace') {
+    e.preventDefault();
+    showStep(currentStepIdx - 1);
+  } else if (e.key === 'Home') {
+    e.preventDefault();
+    showStep(0);
+  } else if (e.key === 'End') {
+    e.preventDefault();
+    showStep(buildSteps().length - 1);
+  }
+});
+
+function syncFromHash() {
+  const m = location.hash.match(/step=(\d+)/);
+  showStep(m ? parseInt(m[1], 10) : 0, false);
+}
+window.addEventListener('hashchange', syncFromHash);
+syncFromHash();
+</script>
+</body>
+</html>
