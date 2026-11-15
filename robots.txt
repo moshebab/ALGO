@@ -1,0 +1,11 @@
+# Allow Googlebot/Bingbot to read <meta name="robots" content="noindex"> so URLs never appear in search
+User-agent: Googlebot
+Disallow: /*.json$
+Disallow: /*.pdf$
+
+User-agent: Bingbot
+Disallow: /*.json$
+Disallow: /*.pdf$
+
+User-agent: *
+Disallow: /

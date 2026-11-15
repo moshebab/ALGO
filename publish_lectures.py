@@ -63,6 +63,22 @@ def is_safe_public_file(filename: str) -> bool:
     return False
 
 
+
+
+def inject_noindex_into_html(html_path: Path) -> None:
+    txt = html_path.read_text(encoding="utf-8")
+    if 'name="robots"' in txt.lower():
+        return
+    meta = (
+        '<meta name="robots" content="noindex, nofollow, noarchive, nosnippet">'
+        '<meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet">'
+    )
+    updated, count = re.subn(r"(<head[^>]*>)", r"\1\n  " + meta, txt, count=1, flags=re.IGNORECASE)
+    if count == 0:
+        updated = meta + "\n" + txt
+    html_path.write_text(updated, encoding="utf-8")
+
+
 def sync_lectures_and_build_index(published_nums: list[str]) -> None:
     source_index_path = SOURCE_REPO / "index.html"
     if not source_index_path.exists():
@@ -168,6 +184,8 @@ def sync_lectures_and_build_index(published_nums: list[str]) -> None:
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="robots" content="noindex, nofollow, noarchive, nosnippet">
+  <meta name="googlebot" content="noindex, nofollow, noarchive, nosnippet">
   <title>ALGO — אלגוריתמים (67504) | שקפי הרצאות</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -248,6 +266,24 @@ def sync_lectures_and_build_index(published_nums: list[str]) -> None:
 """
     (REPO_DIR / "index.html").write_text(index_html, encoding="utf-8")
     (REPO_DIR / ".nojekyll").write_text("", encoding="utf-8")
+    for html_file in (REPO_DIR / "lectures").rglob("*.html"):
+        inject_noindex_into_html(html_file)
+    (REPO_DIR / "robots.txt").write_text(
+        """# Allow Googlebot/Bingbot to read <meta name="robots" content="noindex"> so URLs never appear in search
+User-agent: Googlebot
+Disallow: /*.json$
+Disallow: /*.pdf$
+
+User-agent: Bingbot
+Disallow: /*.json$
+Disallow: /*.pdf$
+
+User-agent: *
+Disallow: /
+""",
+        encoding="utf-8",
+    )
+
     print(f"Built index.html and synced lectures for published lectures: {', '.join(sorted(published_nums))}")
 
 
