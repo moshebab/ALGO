@@ -7,6 +7,7 @@ Usage:
   python3 publish_lectures.py 07 08 09     # set published lectures to 07, 08, 09
   python3 publish_lectures.py --add 09     # add lecture 09 to published list
 """
+import hashlib
 import json
 import os
 import re
@@ -132,13 +133,18 @@ def sync_lectures_and_build_index(published_nums: list[str]) -> None:
         for href in hrefs:
             if href.startswith(("http://", "https://", "mailto:", "#", "data:")):
                 continue
-            src_target = SOURCE_REPO / href
-            dst_target = REPO_DIR / href
+            href_clean = href.split("?")[0].split("#")[0]
+            src_target = SOURCE_REPO / href_clean
+            dst_target = REPO_DIR / href_clean
             if "notes" in dst_target.name.lower() or dst_target.suffix.lower() == ".md":
                 raise RuntimeError(f"Refusing to publish internal file linked in card: {href}")
             if src_target.exists() and src_target.is_file():
                 dst_target.parent.mkdir(parents=True, exist_ok=True)
                 shutil.copy2(src_target, dst_target)
+                ver = hashlib.sha256(dst_target.read_bytes()).hexdigest()[:8]
+                card_html = card_html.replace(f'href="{href}"', f'href="{href_clean}?v={ver}"')
+
+        selected_cards[-1] = card_html
 
         # Check relative refs inside copied HTML files and copy any needed local assets
         for html_file in list(dst_dir.glob("*.html")):
