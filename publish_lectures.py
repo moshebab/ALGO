@@ -120,8 +120,10 @@ def sync_lectures_and_build_index(published_nums: list[str]) -> None:
         dst_dir = lectures_out / src_dir.name
         dst_dir.mkdir(parents=True, exist_ok=True)
 
-        # Copy all public slide/animation HTML files in that lecture folder
+        # Copy public slide/animation HTML files in that lecture folder
         for item in sorted(src_dir.iterdir()):
+            if src_dir.name == "08-set-cover" and item.name != "slides-set-cover.html":
+                continue
             if item.is_file() and is_safe_public_file(item.name):
                 shutil.copy2(item, dst_dir / item.name)
 
